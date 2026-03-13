@@ -293,11 +293,19 @@ courses = [
 for course in courses:
     st.sidebar.markdown(f'<div style="background-color:{course["color"]}; padding:5px; border-radius:5px; margin:2px 0;"><strong>{course["code"]}</strong><br/>{course["name"]}</div>', unsafe_allow_html=True)
 
-# Get API key from secrets
-try:
-    api_key = st.secrets["OPENAI_API_KEY"]
-except KeyError:
-    st.error("OpenAI API key not found in secrets. Please set it in Streamlit Cloud settings.")
+# Get API key from secrets or environment
+import os
+api_key = None
+if "OPENAI_API_KEY" in os.environ:
+    api_key = os.environ["OPENAI_API_KEY"]
+else:
+    try:
+        api_key = st.secrets["OPENAI_API_KEY"]
+    except KeyError:
+        pass
+
+if not api_key:
+    st.error("OpenAI API key not found. Please set OPENAI_API_KEY environment variable or add it to Streamlit secrets.")
     st.stop()
 
 # Initialize chat history
