@@ -294,8 +294,12 @@ courses = [
 for course in courses:
     st.sidebar.markdown(f'<div style="background-color:{course["color"]}; padding:5px; border-radius:5px; margin:2px 0;"><strong>{course["code"]}</strong><br/>{course["name"]}</div>', unsafe_allow_html=True)
 
-# API Key input
-api_key = st.sidebar.text_input("Anthropic API Key", type="password", help="Enter your Anthropic API key to use Claude")
+# Get API key from secrets
+try:
+    api_key = st.secrets["ANTHROPIC_API_KEY"]
+except KeyError:
+    st.error("Anthropic API key not found in secrets. Please set it in Streamlit Cloud settings.")
+    st.stop()
 
 # Initialize chat history
 if "messages" not in st.session_state:
@@ -312,25 +316,22 @@ for message in st.session_state.messages:
 
 # Chat input
 if prompt := st.chat_input("Ask about your syllabus..."):
-    if not api_key:
-        st.error("Please enter your Anthropic API key in the sidebar.")
-    else:
-        # Add user message
-        st.session_state.messages.append({"role": "user", "content": prompt, "sources": []})
-        with st.chat_message("user"):
-            st.markdown(prompt)
+    # Add user message
+    st.session_state.messages.append({"role": "user", "content": prompt, "sources": []})
+    with st.chat_message("user"):
+        st.markdown(prompt)
 
-        # Get assistant response
-        with st.chat_message("assistant"):
-            with st.spinner("Thinking..."):
-                try:
-                    history = [{"role": m["role"], "content": m["content"]} for m in st.session_state.messages[:-1] if m["role"] != "system"]
-                    answer, sources = ask_claude(prompt, history, api_key)
-                    st.markdown(answer)
-                    if sources:
-                        st.markdown("**Sources:** " + ", ".join(sources))
-                    st.session_state.messages.append({"role": "assistant", "content": answer, "sources": sources})
-                except Exception as e:
-                    error_msg = f"⚠️ Error: {str(e)}"
-                    st.error(error_msg)
-                    st.session_state.messages.append({"role": "assistant", "content": error_msg, "sources": []})
+    # Get assistant response
+    with st.chat_message("assistant"):
+        with st.spinner("Thinking..."):
+            try:
+                history = [{"role": m["role"], "content": m["content"]} for m in st.session_state.messages[:-1] if m["role"] != "system"]
+                answer, sources = ask_claude(prompt, history, api_key)
+                st.markdown(answer)
+                if sources:
+                    st.markdown("**Sources:** " + ", ".join(sources))
+                st.session_state.messages.append({"role": "assistant", "content": answer, "sources": sources})
+            except Exception as e:
+                error_msg = f"⚠️ Error: {str(e)}"
+                st.error(error_msg)
+                st.session_state.messages.append({"role": "assistant", "content": error_msg, "sources": []})
