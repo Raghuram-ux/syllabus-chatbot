@@ -2,7 +2,7 @@ import streamlit as st
 import re
 from collections import Counter
 import math
-from anthropic import Anthropic
+from openai import OpenAI
 
 # ── Embedded knowledge base (RAG corpus) ──────────────────────────────────────
 SYLLABUS_CHUNKS = [
@@ -246,8 +246,8 @@ def retrieve_chunks(query, top_k=3):
     return [chunk for chunk, _ in scored[:top_k]]
 
 # ── API call ──────────────────────────────────────────────────────────────────
-def ask_claude(query, history, api_key):
-    client = Anthropic(api_key=api_key)
+def ask_openai(query, history, api_key):
+    client = OpenAI(api_key=api_key)
     relevant_chunks = retrieve_chunks(query, 4)
     context = '\n\n---\n\n'.join(f"[{c['subject']}]\n{c['content']}" for c in relevant_chunks)
 
@@ -259,16 +259,15 @@ Format your answer neatly. Use bullet points for lists.
 SYLLABUS CONTEXT:
 {context}"""
 
-    messages = history + [{"role": "user", "content": query}]
+    messages = [{"role": "system", "content": system_prompt}] + history + [{"role": "user", "content": query}]
 
-    response = client.messages.create(
-        model="claude-3-5-sonnet-20241022",
+    response = client.chat.completions.create(
+        model="gpt-3.5-turbo",
         max_tokens=1000,
-        system=system_prompt,
         messages=messages,
     )
 
-    answer = response.content[0].text
+    answer = response.choices[0].message.content
     sources = [c['subject'] for c in relevant_chunks]
     return answer, sources
 
@@ -296,9 +295,9 @@ for course in courses:
 
 # Get API key from secrets
 try:
-    api_key = st.secrets["ANTHROPIC_API_KEY"]
+    api_key = st.secrets["OPENAI_API_KEY"]
 except KeyError:
-    st.error("Anthropic API key not found in secrets. Please set it in Streamlit Cloud settings.")
+    st.error("OpenAI API key not found in secrets. Please set it in Streamlit Cloud settings.")
     st.stop()
 
 # Initialize chat history
@@ -326,7 +325,7 @@ if prompt := st.chat_input("Ask about your syllabus..."):
         with st.spinner("Thinking..."):
             try:
                 history = [{"role": m["role"], "content": m["content"]} for m in st.session_state.messages[:-1] if m["role"] != "system"]
-                answer, sources = ask_claude(prompt, history, api_key)
+                answer, sources = ask_openai(prompt, history, api_key)
                 st.markdown(answer)
                 if sources:
                     st.markdown("**Sources:** " + ", ".join(sources))
